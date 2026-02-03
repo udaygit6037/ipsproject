@@ -66,6 +66,12 @@ const userSchema = new mongoose.Schema({
   }
 });
 
+// Indexes for performance
+userSchema.index({ email: 1 }); // Already unique, but explicit index
+userSchema.index({ role: 1, isActive: 1 }); // For role-based queries
+userSchema.index({ studentId: 1 }, { sparse: true }); // For student lookups
+userSchema.index({ createdAt: -1 }); // For sorting by creation date
+
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {
     return next();

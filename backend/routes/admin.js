@@ -1,13 +1,17 @@
 import express from 'express';
 import {
   getDashboardStats,
+  getEnhancedStats,
   getAllUsers,
   getUserById,
   updateUser,
   deleteUser,
   getAllBookings,
   approveForumPost,
-  pinForumPost
+  pinForumPost,
+  getUserGrowth,
+  getTopCounsellors,
+  getRecentActivity
 } from '../controllers/adminController.js';
 import { authenticate } from '../middlewares/authMiddleware.js';
 import { authorizeRoles } from '../middlewares/roleMiddleware.js';
@@ -18,6 +22,10 @@ router.use(authenticate);
 router.use(authorizeRoles('admin'));
 
 router.get('/stats', getDashboardStats);
+router.get('/stats/enhanced', getEnhancedStats);
+router.get('/analytics/user-growth', getUserGrowth);
+router.get('/analytics/top-counsellors', getTopCounsellors);
+router.get('/analytics/recent-activity', getRecentActivity);
 
 router.get('/users', getAllUsers);
 

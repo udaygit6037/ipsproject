@@ -13,7 +13,6 @@ import {
   Calendar,
   Users,
   BarChart3,
-  Settings,
   MessageCircle
 } from 'lucide-react';
 
@@ -87,11 +86,6 @@ const Sidebar = () => {
             name: 'Users',
             icon: Users,
             path: '/users',
-          },
-          {
-            name: 'Settings',
-            icon: Settings,
-            path: '/settings',
           },
         ];
 

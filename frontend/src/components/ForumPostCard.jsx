@@ -8,8 +8,15 @@ import { MessageCircle, Heart, Share2, MoreHorizontal, Flag, Clock } from 'lucid
 import { formatDate } from '../utils/helpers.js';
 
 const ForumPostCard = ({ post, onReply, onLike, onReport }) => {
-  const [isLiked, setIsLiked] = useState(post.isLiked || false);
-  const [likes, setLikes] = useState(post.likes || 0);
+  const initialLikes =
+    typeof post.likesCount === 'number'
+      ? post.likesCount
+      : Array.isArray(post.likes)
+      ? post.likes.length
+      : post.likes || 0;
+
+  const [isLiked, setIsLiked] = useState(!!post.isLiked);
+  const [likes, setLikes] = useState(initialLikes);
   const [showMenu, setShowMenu] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
 
@@ -20,7 +27,7 @@ const ForumPostCard = ({ post, onReply, onLike, onReport }) => {
     setIsLiked(!isLiked);
     setLikes(prev => isLiked ? prev - 1 : prev + 1);
     if (onLike) {
-      onLike(post.id, !isLiked);
+      onLike(post._id || post.id, !isLiked);
     }
   };
 
@@ -29,7 +36,7 @@ const ForumPostCard = ({ post, onReply, onLike, onReport }) => {
    */
   const handleReply = () => {
     if (onReply) {
-      onReply(post.id);
+      onReply(post._id || post.id);
     }
   };
 
@@ -80,11 +87,24 @@ const ForumPostCard = ({ post, onReply, onLike, onReport }) => {
       {/* Post Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <img
-            src={post.author.avatar}
-            alt={post.author.name}
-            className="w-10 h-10 rounded-full object-cover"
-          />
+          {post.author?.avatar ? (
+            <img
+              src={post.author.avatar}
+              alt={post.author.name}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+              <span className="text-primary-600 font-semibold text-sm">
+                {(post.author?.name || 'User')
+                  .split(' ')
+                  .filter(Boolean)
+                  .map(n => n[0])
+                  .join('')
+                  .toUpperCase()}
+              </span>
+            </div>
+          )}
           <div>
             <h4 className="font-medium text-gray-900">{post.author.name}</h4>
             <div className="flex items-center space-x-2 text-sm text-gray-500">
@@ -179,12 +199,12 @@ const ForumPostCard = ({ post, onReply, onLike, onReport }) => {
             className="flex items-center space-x-2 text-sm text-gray-600 hover:text-primary-600 transition-colors"
           >
             <MessageCircle className="w-4 h-4" />
-            <span>{post.replies?.length || 0} replies</span>
+            <span>{post.comments?.length || 0} replies</span>
           </button>
         </div>
 
         {/* View Replies Toggle */}
-        {post.replies && post.replies.length > 0 && (
+        {post.comments && post.comments.length > 0 && (
           <button
             onClick={() => setShowReplies(!showReplies)}
             className="text-sm text-primary-600 hover:text-primary-700 font-medium"
@@ -195,16 +215,29 @@ const ForumPostCard = ({ post, onReply, onLike, onReport }) => {
       </div>
 
       {/* Replies Section */}
-      {showReplies && post.replies && post.replies.length > 0 && (
+      {showReplies && post.comments && post.comments.length > 0 && (
         <div className="mt-4 pl-4 border-l-2 border-gray-200 space-y-4">
-          {post.replies.map((reply) => (
-            <div key={reply.id} className="bg-gray-50 rounded-lg p-4">
+          {post.comments.map((reply) => (
+            <div key={reply._id} className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center space-x-2 mb-2">
-                <img
-                  src={reply.author.avatar}
-                  alt={reply.author.name}
-                  className="w-6 h-6 rounded-full object-cover"
-                />
+                {reply.author?.avatar ? (
+                  <img
+                    src={reply.author.avatar}
+                    alt={reply.author.name}
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">
+                    <span className="text-primary-600 font-semibold text-xs">
+                      {(reply.author?.name || 'User')
+                        .split(' ')
+                        .filter(Boolean)
+                        .map(n => n[0])
+                        .join('')
+                        .toUpperCase()}
+                    </span>
+                  </div>
+                )}
                 <span className="font-medium text-sm text-gray-900">
                   {reply.author.name}
                 </span>

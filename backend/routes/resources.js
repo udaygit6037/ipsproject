@@ -5,9 +5,10 @@ import {
   getResourceById,
   updateResource,
   deleteResource,
-  likeResource
+  likeResource,
+  getUserResourceReadCount
 } from '../controllers/resourceController.js';
-import { authenticate } from '../middlewares/authMiddleware.js';
+import { authenticate, optionalAuthenticate } from '../middlewares/authMiddleware.js';
 import { authorizeRoles } from '../middlewares/roleMiddleware.js';
 import upload from '../config/cloudinary.js';
 
@@ -15,9 +16,11 @@ const router = express.Router();
 
 router.post('/', authenticate, authorizeRoles('counsellor', 'admin'), upload.single('file'), createResource);
 
-router.get('/', authenticate, getAllResources);
+router.get('/stats/read-count', authenticate, getUserResourceReadCount);
 
-router.get('/:id', authenticate, getResourceById);
+router.get('/', optionalAuthenticate, getAllResources);
+
+router.get('/:id', optionalAuthenticate, getResourceById);
 
 router.put('/:id', authenticate, updateResource);
 

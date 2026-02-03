@@ -83,6 +83,13 @@ const forumPostSchema = new mongoose.Schema({
   }
 });
 
+// Indexes for performance
+forumPostSchema.index({ category: 1, createdAt: -1 }); // Category-based queries
+forumPostSchema.index({ author: 1, createdAt: -1 }); // User posts query
+forumPostSchema.index({ isApproved: 1, isPinned: -1, createdAt: -1 }); // Main feed query
+forumPostSchema.index({ tags: 1 }); // Tag-based search
+forumPostSchema.index({ createdAt: -1 }); // Sorting by date
+
 forumPostSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();

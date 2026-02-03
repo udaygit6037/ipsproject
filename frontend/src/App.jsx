@@ -8,14 +8,21 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 
 // Import pages
+import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
 import StudentDashboard from './pages/StudentDashboard.jsx';
 import CounsellorDashboard from './pages/CounsellorDashboard.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import Resources from './pages/Resources.jsx';
 import Forum from './pages/Forum.jsx';
 import Booking from './pages/Booking.jsx';
+import Chat from './pages/Chat.jsx';
+import Sessions from './pages/Sessions.jsx';
+import Students from './pages/Students.jsx';
+import Analytics from './pages/Analytics.jsx';
+import Users from './pages/Users.jsx';
 
 /**
  * Protected Route Component
@@ -33,7 +40,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace />;  
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
@@ -93,6 +100,8 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Public Routes */}
+      <Route path="/" element={<Landing />} />
+
       <Route
         path="/login"
         element={
@@ -106,6 +115,15 @@ const AppRoutes = () => {
         element={
           <PublicRoute>
             <Signup />
+          </PublicRoute>
+        }
+      />
+
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPassword />
           </PublicRoute>
         }
       />
@@ -167,10 +185,53 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
-      {/* Default Route */}
       <Route
-        path="/"
+        path="/chat"
+        element={
+          <ProtectedRoute allowedRoles={['student']}>
+            <Chat />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Protected Routes - Counsellor Only */}
+      <Route
+        path="/sessions"
+        element={
+          <ProtectedRoute allowedRoles={['counsellor']}>
+            <Sessions />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/students"
+        element={
+          <ProtectedRoute allowedRoles={['counsellor']}>
+            <Students />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Protected Routes - Admin Only */}
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <Analytics />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <Users />
+          </ProtectedRoute>
+        }
+      />
+      {/* Default Dashboard Redirect */}
+      <Route
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <DefaultDashboard />

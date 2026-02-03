@@ -1,68 +1,156 @@
 
-# Project Title
+# Digital Psychological Intervention (DPI)
 
-A brief description of what this project does and who it's for
+A full-stack mental health support platform for colleges that combines clinical workflows, student-facing digital therapeutics, community resources, and role-based administration.
 
-it is a DIGITAL mental health support system
+## ✨ What’s Included
 
-## Acknowledgements
+- Modern landing page aligned with the in-app visual system (Tailwind + Lucide icons)
+- Role-based authentication (student, counsellor, admin) backed by JWT-secured Express APIs
+- Dashboards for each persona with bookings, resources, and forum integrations
+- Cloudinary-powered resource uploads and MongoDB persistence
 
- - [Awesome Readme Templates](https://awesomeopensource.com/project/elangosundar/awesome-README-templates)
- - [Awesome README](https://github.com/matiassingers/awesome-readme)
- - [How to write a Good readme](https://bulldogjob.com/news/449-how-to-write-a-good-readme-for-your-github-project)
+## 🧱 Tech Stack
 
+| Layer     | Stack                                                                 |
+|-----------|-----------------------------------------------------------------------|
+| Frontend  | React 18, Vite, Tailwind CSS, React Router, Axios, Lucide icons       |
+| Backend   | Node.js 20, Express, MongoDB/Mongoose, JWT, Multer, Cloudinary        |
+| Security  | Helmet.js, Express Rate Limit, Express Validator, Refresh Tokens       |
+| Tooling   | ESLint, PostCSS, Tailwind CLI, Jest, Docker                           |
 
-## API Reference
+## 🚀 Quick Start
 
-#### Get all items
+### 1. Clone & Install
 
-```http
-  GET /api/items
+```bash
+git clone <repo-url>
+cd test
 ```
 
-| Parameter | Type     | Description                |
-| :-------- | :------- | :------------------------- |
-| `api_key` | `string` | **Required**. Your API key |
+Install dependencies for each workspace:
 
-#### Get item
-
-```http
-  GET /api/items/${id}
+```bash
+cd backend && npm install
+cd ../frontend && npm install
 ```
 
-| Parameter | Type     | Description                       |
-| :-------- | :------- | :-------------------------------- |
-| `id`      | `string` | **Required**. Id of item to fetch |
+### 2. Environment Variables
 
-#### add(num1, num2)
+Use the provided templates to bootstrap configuration:
 
-Takes two numbers and returns the sum.
+- `backend/env.example` → copy to `backend/.env` and fill MongoDB, JWT, and Cloudinary secrets.
+- `frontend/env.example` → copy to `frontend/.env` and point `VITE_API_BASE_URL` at your backend (defaults to `http://localhost:5000/api`).
 
+### 3. Run the Backend
 
-## Appendix
+```bash
+cd backend
+npm run dev
+```
 
-Any additional information goes here
+The API boots on `http://localhost:5000` with routes such as:
 
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/bookings/my-bookings`
+- `GET /api/resources`
 
-## Authors
+Seed data (optional):
 
-- [@octokatherine](https://www.github.com/octokatherine)
+```bash
+npm run seed
+```
 
+### 4. Run the Frontend
 
-## Badges
+```bash
+cd frontend
+npm run dev
+```
 
-Add badges from somewhere like: [shields.io](https://shields.io/)
+Open the Vite URL (default `http://localhost:5173`). The public landing page now lives at `/`, with login/signup flows under `/login` and `/signup`.
 
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
-[![GPLv3 License](https://img.shields.io/badge/License-GPL%20v3-yellow.svg)](https://opensource.org/licenses/)
-[![AGPL License](https://img.shields.io/badge/license-AGPL-blue.svg)](http://www.gnu.org/licenses/agpl-3.0)
+### 5. Demo Credentials
 
-## Color Reference
+Use the built-in shortcut buttons on the login page or manually enter:
 
-| Color             | Hex                                                                |
-| ----------------- | ------------------------------------------------------------------ |
-| Example Color | ![#0a192f](https://via.placeholder.com/10/0a192f?text=+) #0a192f |
-| Example Color | ![#f8f8f8](https://via.placeholder.com/10/f8f8f8?text=+) #f8f8f8 |
-| Example Color | ![#00b48a](https://via.placeholder.com/10/00b48a?text=+) #00b48a |
-| Example Color | ![#00d1a0](https://via.placeholder.com/10/00b48a?text=+) #00d1a0 |
+| Role        | Email                              | Password       |
+|-------------|------------------------------------|----------------|
+| Student     | john.student@university.edu        | student123     |
+| Counsellor  | sarah.wilson@university.edu        | counsellor123  |
+| Admin       | admin@university.edu               | admin123       |
+
+## 🧩 Project Structure
+
+```
+backend/   Express API, routes, controllers, Mongo models
+frontend/  Vite + React SPA with Tailwind styling
+```
+
+Key frontend routes:
+
+- `/` — marketing landing page
+- `/login`, `/signup` — public auth routes (auto-redirect authenticated users)
+- `/student-dashboard`, `/counsellor-dashboard`, `/admin-dashboard` — role-specific areas
+- `/resources`, `/forum`, `/booking` — shared authenticated experiences
+
+## ✅ Integration Checklist
+
+- `frontend/src/utils/api.js` centralizes the Axios client with token interceptors tied to `sessionStorage`.
+- Auth context persists JWT/user payloads so both the landing page and protected dashboards remain in sync.
+- Backend routes are mounted under `/api/*` and protected with `authenticate` middleware where required.
+- Cloudinary configuration lives in `backend/config/cloudinary.js`; adjust folders or limits as needed.
+
+## 🔒 Security Features
+
+- **Helmet.js** - Security headers protection
+- **Rate Limiting** - Protection against brute-force and DDoS attacks
+- **Input Validation** - Express Validator for request sanitization
+- **Refresh Tokens** - Secure token rotation mechanism
+- **CORS Configuration** - Restricted origin access
+- **NoSQL Injection Protection** - Input sanitization middleware
+- **Password Policy** - Strong password requirements (8+ chars, uppercase, lowercase, number)
+
+## 🚀 Deployment Options
+
+### Docker Compose (Recommended)
+
+```bash
+docker-compose up -d
+```
+
+### Manual Deployment
+
+See `IMPLEMENTATION_GUIDE.md` for detailed setup instructions.
+
+## 📊 Code Quality
+
+- **Testing**: Jest test suite with coverage reporting
+- **Linting**: ESLint configuration
+- **CI/CD**: GitHub Actions workflow
+- **Error Handling**: Centralized error handling middleware
+- **Logging**: Structured logging utility
+
+## 📚 Documentation
+
+- `CODE_REVIEW.md` - Comprehensive code review and recommendations
+- `IMPLEMENTATION_GUIDE.md` - Step-by-step implementation guide
+- `backend/ENV_SETUP_GUIDE.md` - Environment configuration guide
+
+## 🧪 Testing
+
+```bash
+# Backend tests
+cd backend
+npm test
+
+# Frontend build test
+cd frontend
+npm run build
+```
+
+## 📄 License
+
+MIT © Digital Psychological Intervention Team
 

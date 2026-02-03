@@ -91,6 +91,13 @@ const resourceSchema = new mongoose.Schema({
   }
 });
 
+// Indexes for performance
+resourceSchema.index({ category: 1, isPublished: 1, createdAt: -1 }); // Category queries
+resourceSchema.index({ uploadedBy: 1, createdAt: -1 }); // User resources query
+resourceSchema.index({ tags: 1 }); // Tag-based search
+resourceSchema.index({ isPublished: 1, views: -1 }); // Popular resources query
+resourceSchema.index({ createdAt: -1 }); // Sorting by date
+
 resourceSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Navbar from '../components/Navbar.jsx';
 import Sidebar from '../components/Sidebar.jsx';
@@ -23,6 +24,7 @@ import api from '../utils/api.js';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState('week');
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -47,8 +49,8 @@ const AdminDashboard = () => {
         setLoading(true);
         setError(null);
 
-        // Fetch dashboard stats
-        const statsResponse = await api.get('/admin/stats');
+        // Fetch enhanced dashboard stats
+        const statsResponse = await api.get('/admin/stats/enhanced');
         const statsData = statsResponse.data.data.stats;
         
         setStats({
@@ -56,60 +58,37 @@ const AdminDashboard = () => {
           activeStudents: statsData.totalStudents,
           activeCounsellors: statsData.totalCounsellors,
           totalSessions: statsData.totalBookings,
-          completionRate: statsData.totalBookings > 0 ? 
-            Math.round(((statsData.totalBookings - statsData.pendingBookings) / statsData.totalBookings) * 100) : 0,
-          avgRating: 4.6 // This would need to be calculated from actual ratings
+          completionRate: statsData.completionRate,
+          avgRating: 4.6 // Placeholder until rating system is implemented
         });
 
-        // Fetch all users for counsellor stats
-        const usersResponse = await api.get('/admin/users');
-        const users = usersResponse.data.data.users;
-        const counsellors = users.filter(u => u.role === 'counsellor');
-        
-        // Mock top counsellors data (would need actual session/rating data)
-        setTopCounsellors(counsellors.slice(0, 3).map(counsellor => ({
-          id: counsellor._id,
+        // Fetch top counsellors from database
+        const topCounsellorsResponse = await api.get('/admin/analytics/top-counsellors');
+        const topCounsellorsData = topCounsellorsResponse.data.data.counsellors;
+        setTopCounsellors(topCounsellorsData.map(counsellor => ({
+          id: counsellor.id,
           name: counsellor.name,
-          avatar: 'https://images.pexels.com/photos/5327585/pexels-photo-5327585.jpeg?auto=compress&cs=tinysrgb&w=150',
-          sessions: Math.floor(Math.random() * 100) + 50, // Mock data
-          rating: 4.5 + Math.random() * 0.5, // Mock data
-          specialization: counsellor.specialization || 'General Counseling'
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(counsellor.name)}&background=random`,
+          sessions: counsellor.sessions,
+          rating: counsellor.rating,
+          specialization: counsellor.specialization
         })));
 
-        // Mock recent activity (would need actual activity logs)
-        setRecentActivity([
-          {
-            id: 1,
-            type: 'user_registration',
-            message: `New student registered: ${users.filter(u => u.role === 'student').length} total students`,
-            timestamp: new Date().toISOString(),
-            severity: 'info'
-          },
-          {
-            id: 2,
-            type: 'session_completed',
-            message: `${statsData.totalBookings - statsData.pendingBookings} sessions completed today`,
-            timestamp: new Date(Date.now() - 3600000).toISOString(),
-            severity: 'success'
-          },
-          {
-            id: 3,
-            type: 'counsellor_joined',
-            message: `${statsData.totalCounsellors} active counsellors`,
-            timestamp: new Date(Date.now() - 7200000).toISOString(),
-            severity: 'success'
-          }
-        ]);
+        // Fetch recent activity from database
+        const activityResponse = await api.get('/admin/analytics/recent-activity');
+        const activities = activityResponse.data.data.activities;
+        setRecentActivity(activities.map((activity, index) => ({
+          id: index + 1,
+          type: activity.type,
+          message: activity.message,
+          timestamp: activity.timestamp,
+          severity: activity.severity
+        })));
 
-        // Mock user growth data (would need historical data)
-        setUserGrowth([
-          { month: 'Jan', students: Math.floor(statsData.totalStudents * 0.1), counsellors: Math.floor(statsData.totalCounsellors * 0.2) },
-          { month: 'Feb', students: Math.floor(statsData.totalStudents * 0.2), counsellors: Math.floor(statsData.totalCounsellors * 0.4) },
-          { month: 'Mar', students: Math.floor(statsData.totalStudents * 0.3), counsellors: Math.floor(statsData.totalCounsellors * 0.6) },
-          { month: 'Apr', students: Math.floor(statsData.totalStudents * 0.5), counsellors: Math.floor(statsData.totalCounsellors * 0.8) },
-          { month: 'May', students: Math.floor(statsData.totalStudents * 0.7), counsellors: Math.floor(statsData.totalCounsellors * 0.9) },
-          { month: 'Jun', students: statsData.totalStudents, counsellors: statsData.totalCounsellors }
-        ]);
+        // Fetch user growth data from database
+        const growthResponse = await api.get('/admin/analytics/user-growth');
+        const growthData = growthResponse.data.data.growth;
+        setUserGrowth(growthData);
 
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -349,7 +328,10 @@ const AdminDashboard = () => {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold text-gray-900">Recent Activity</h2>
-                  <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                  <button 
+                    onClick={() => navigate('/analytics')}
+                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                  >
                     View All
                   </button>
                 </div>
@@ -380,7 +362,10 @@ const AdminDashboard = () => {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold text-gray-900">Top Counsellors</h2>
-                  <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                  <button 
+                    onClick={() => navigate('/users?role=counsellor')}
+                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                  >
                     View All
                   </button>
                 </div>
@@ -409,7 +394,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              {/* System Health */}
+              {/* System Health
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">System Health</h2>
                 <div className="space-y-4">
@@ -442,27 +427,32 @@ const AdminDashboard = () => {
                     <span className="text-sm font-medium text-green-600">99.9%</span>
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               {/* Quick Actions */}
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
                 <div className="space-y-3">
-                  <button className="w-full flex items-center justify-center space-x-2 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors">
+                  <button
+                    onClick={() => navigate('/users')}
+                    className="w-full flex items-center justify-center space-x-2 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors"
+                  >
                     <Users className="w-4 h-4" />
                     <span>Manage Users</span>
                   </button>
-                  <button className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors">
+                  <button
+                    onClick={() => navigate('/users?role=counsellor')}
+                    className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors"
+                  >
                     <UserCheck className="w-4 h-4" />
                     <span>Approve Counsellors</span>
                   </button>
-                  <button className="w-full flex items-center justify-center space-x-2 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors">
+                  <button
+                    onClick={() => navigate('/analytics')}
+                    className="w-full flex items-center justify-center space-x-2 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors"
+                  >
                     <BarChart3 className="w-4 h-4" />
                     <span>View Analytics</span>
-                  </button>
-                  <button className="w-full flex items-center justify-center space-x-2 bg-gray-600 text-white py-3 rounded-lg hover:bg-gray-700 transition-colors">
-                    <Settings className="w-4 h-4" />
-                    <span>System Settings</span>
                   </button>
                 </div>
               </div>

@@ -1,12 +1,15 @@
 /**
  * AI-Guided First Aid ChatBox Component
- * Provides psychological first aid through AI-powered chat interface
+ * Provides psychological first aid through AI-powered chat interface using Wit.ai
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Heart } from 'lucide-react';
+import { Send, Bot, User, Heart, Calendar, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import api from '../utils/api.js';
 
 const ChatBox = () => {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -17,21 +20,8 @@ const ChatBox = () => {
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
-
-  // Mock AI responses for psychological first aid
-  const mockResponses = [
-    "I understand you're going through a difficult time. It's completely normal to feel this way, and I'm here to help.",
-    "Thank you for sharing that with me. Your feelings are valid, and it takes courage to reach out for support.",
-    "Let's take a moment to focus on your breathing. Try taking slow, deep breaths - in for 4 counts, hold for 4, out for 4.",
-    "It sounds like you're dealing with a lot right now. Remember that it's okay to take things one step at a time.",
-    "I hear that you're feeling overwhelmed. Would it help to talk about what's been weighing on your mind the most?",
-    "You're showing great strength by seeking help. That's an important first step in taking care of your mental health.",
-    "Sometimes when we're stressed, it helps to ground ourselves. Can you name 5 things you can see around you right now?",
-    "I want you to know that what you're experiencing is temporary, even though it might not feel that way right now.",
-    "It's important to be gentle with yourself during difficult times. What's one small thing you could do today to show yourself kindness?",
-    "Remember that seeking help is a sign of strength, not weakness. You're taking positive steps by being here."
-  ];
 
   /**
    * Scroll to bottom of messages
@@ -45,37 +35,10 @@ const ChatBox = () => {
   }, [messages]);
 
   /**
-   * Generate mock AI response
-   */
-  const generateResponse = (userMessage) => {
-    const lowerMessage = userMessage.toLowerCase();
-    
-    // Keyword-based responses for more relevant replies
-    if (lowerMessage.includes('anxious') || lowerMessage.includes('anxiety')) {
-      return "I understand you're feeling anxious. Anxiety is very common and treatable. Try the 5-4-3-2-1 grounding technique: name 5 things you see, 4 you can touch, 3 you hear, 2 you smell, and 1 you taste.";
-    }
-    
-    if (lowerMessage.includes('sad') || lowerMessage.includes('depressed')) {
-      return "I'm sorry you're feeling this way. Depression can make everything feel overwhelming, but you're not alone. Small steps like getting sunlight, gentle movement, or connecting with someone can help.";
-    }
-    
-    if (lowerMessage.includes('stress') || lowerMessage.includes('overwhelmed')) {
-      return "Stress can feel overwhelming, but there are ways to manage it. Try breaking tasks into smaller pieces, practice deep breathing, and remember it's okay to ask for help.";
-    }
-    
-    if (lowerMessage.includes('panic') || lowerMessage.includes('panic attack')) {
-      return "If you're experiencing panic, remember: you are safe, this will pass, and you can get through this. Focus on slow, deep breathing and try to ground yourself in the present moment.";
-    }
-    
-    // Default to random supportive response
-    return mockResponses[Math.floor(Math.random() * mockResponses.length)];
-  };
-
-  /**
-   * Handle sending a message
+   * Handle sending a message to Wit.ai via backend API
    */
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || isTyping) return;
 
     const userMessage = {
       id: Date.now(),
@@ -84,23 +47,46 @@ const ChatBox = () => {
       timestamp: new Date()
     };
 
-    // Add user message
+    // Add user message immediately
     setMessages(prev => [...prev, userMessage]);
+    const messageToSend = inputMessage;
     setInputMessage('');
     setIsTyping(true);
+    setError(null);
 
-    // Simulate AI thinking time
-    setTimeout(() => {
+    try {
+      // Call backend API which integrates with Wit.ai
+      const response = await api.post('/chat/message', {
+        message: messageToSend
+      });
+
       const botResponse = {
         id: Date.now() + 1,
-        text: generateResponse(inputMessage),
+        text: response.data.data.message,
         sender: 'bot',
-        timestamp: new Date()
+        timestamp: new Date(),
+        suggestBooking: response.data.data.suggestBooking,
+        isEmergency: response.data.data.isEmergency || false
       };
 
       setMessages(prev => [...prev, botResponse]);
+    } catch (error) {
+      console.error('Chat API error:', error);
+      setError('Failed to get response. Please try again.');
+      
+      // Fallback response on error
+      const fallbackResponse = {
+        id: Date.now() + 1,
+        text: "I'm having trouble connecting right now. Please try again, or consider booking a session with one of our counsellors for immediate support.",
+        sender: 'bot',
+        timestamp: new Date(),
+        suggestBooking: true
+      };
+      
+      setMessages(prev => [...prev, fallbackResponse]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   /**
@@ -143,11 +129,15 @@ const ChatBox = () => {
                 className={`w-8 h-8 rounded-full flex items-center justify-center ${
                   message.sender === 'user'
                     ? 'bg-primary-600 text-white'
+                    : message.isEmergency
+                    ? 'bg-red-200 text-red-600'
                     : 'bg-gray-200 text-gray-600'
                 }`}
               >
                 {message.sender === 'user' ? (
                   <User className="w-4 h-4" />
+                ) : message.isEmergency ? (
+                  <AlertTriangle className="w-4 h-4" />
                 ) : (
                   <Bot className="w-4 h-4" />
                 )}
@@ -158,10 +148,24 @@ const ChatBox = () => {
                 className={`px-4 py-2 rounded-lg ${
                   message.sender === 'user'
                     ? 'bg-primary-600 text-white'
+                    : message.isEmergency
+                    ? 'bg-red-50 text-red-900 border border-red-200'
                     : 'bg-gray-100 text-gray-800'
                 }`}
               >
                 <p className="text-sm">{message.text}</p>
+                
+                {/* Booking suggestion button */}
+                {message.suggestBooking && message.sender === 'bot' && (
+                  <button
+                    onClick={() => navigate('/booking')}
+                    className="mt-2 flex items-center space-x-1 text-xs bg-primary-600 text-white px-3 py-1 rounded hover:bg-primary-700 transition-colors"
+                  >
+                    <Calendar className="w-3 h-3" />
+                    <span>Book a Session</span>
+                  </button>
+                )}
+                
                 <p
                   className={`text-xs mt-1 ${
                     message.sender === 'user' ? 'text-primary-200' : 'text-gray-500'
@@ -217,6 +221,9 @@ const ChatBox = () => {
             <Send className="w-4 h-4" />
           </button>
         </div>
+        {error && (
+          <p className="text-xs text-red-600 mt-2">{error}</p>
+        )}
         <p className="text-xs text-gray-500 mt-2">
           This is an AI assistant for emotional support. For emergencies, please contact professional help.
         </p>

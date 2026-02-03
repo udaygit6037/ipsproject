@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Navbar from '../components/Navbar.jsx';
 import Sidebar from '../components/Sidebar.jsx';
@@ -22,6 +23,7 @@ import api from '../utils/api.js';
 
 const StudentDashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     upcomingSessions: 0,
     completedSessions: 0,
@@ -46,14 +48,27 @@ const StudentDashboard = () => {
         // Fetch bookings
         const bookingsResponse = await api.get('/bookings/my-bookings');
         const bookings = bookingsResponse.data.data.bookings;
-        
-        const upcoming = bookings.filter(booking => 
-          new Date(booking.date) >= new Date() && 
+
+        const upcoming = bookings.filter(booking =>
+          new Date(booking.date) >= new Date() &&
           ['pending', 'confirmed'].includes(booking.status)
         );
         const completed = bookings.filter(booking => booking.status === 'completed');
-        
-        setUpcomingSessions(upcoming.slice(0, 2)); // Show only next 2 sessions
+
+        // Normalise upcoming bookings into the shape expected by the UI
+        const mappedUpcoming = upcoming
+          .sort((a, b) => new Date(a.date) - new Date(b.date))
+          .slice(0, 2)
+          .map(booking => ({
+            id: booking._id,
+            counsellor: booking.counsellor?.name || 'Counsellor',
+            type: booking.sessionType || 'Counseling Session',
+            date: new Date(booking.date).toLocaleDateString(),
+            time: booking.timeSlot?.startTime || '',
+            status: booking.status
+          }));
+
+        setUpcomingSessions(mappedUpcoming); // Show only next 2 sessions
         setStats(prev => ({
           ...prev,
           upcomingSessions: upcoming.length,
@@ -63,16 +78,41 @@ const StudentDashboard = () => {
         // Fetch resources
         const resourcesResponse = await api.get('/resources');
         const resources = resourcesResponse.data.data.resources;
-        setRecentResources(resources.slice(0, 3)); // Show only recent 3
-        setStats(prev => ({
-          ...prev,
-          resourcesRead: resources.length
+        // Map resources to include display properties
+        const mappedResources = resources.slice(0, 3).map(resource => ({
+          id: resource._id,
+          title: resource.title,
+          type: resource.category,
+          readTime: resource.category === 'article' ? '5 min read' : resource.category === 'video' ? '10 min watch' : 'N/A',
+          progress: 0 // Progress tracking would need to be implemented separately
         }));
+        setRecentResources(mappedResources);
+
+        // Fetch user's resource read count
+        try {
+          const readCountResponse = await api.get('/resources/stats/read-count');
+          setStats(prev => ({
+            ...prev,
+            resourcesRead: readCountResponse.data.data.readCount || 0
+          }));
+        } catch (err) {
+          // If endpoint fails, use 0 as default
+          setStats(prev => ({
+            ...prev,
+            resourcesRead: 0
+          }));
+        }
 
         // Fetch forum posts (if user has any)
-        const forumResponse = await api.get('/forum/posts');
+        const forumResponse = await api.get('/forum');
         const posts = forumResponse.data.data.posts;
-        const userPosts = posts.filter(post => post.author._id === user.id);
+        // Fix: Handle both author._id and author.id, and handle anonymous posts
+        const userPosts = posts.filter(post => {
+          if (!post.author) return false;
+          const authorId = post.author._id || post.author.id;
+          const userId = user.id || user._id;
+          return authorId && userId && authorId.toString() === userId.toString();
+        });
         setStats(prev => ({
           ...prev,
           forumPosts: userPosts.length
@@ -167,7 +207,10 @@ const StudentDashboard = () => {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold text-gray-900">Upcoming Sessions</h2>
-                  <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                  <button 
+                    onClick={() => navigate('/booking')}
+                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                  >
                     View All
                   </button>
                 </div>
@@ -193,8 +236,11 @@ const StudentDashboard = () => {
                             {session.status}
                           </span>
                           <div className="mt-2">
-                            <button className="text-primary-600 hover:text-primary-700 text-sm">
-                              Join Session
+                            <button
+                              onClick={() => navigate('/booking')}
+                              className="text-primary-600 hover:text-primary-700 text-sm"
+                            >
+                              View Details
                             </button>
                           </div>
                         </div>
@@ -208,7 +254,10 @@ const StudentDashboard = () => {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold text-gray-900">Continue Learning</h2>
-                  <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                  <button 
+                    onClick={() => navigate('/resources')}
+                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                  >
                     Browse All
                   </button>
                 </div>
@@ -275,15 +324,24 @@ const StudentDashboard = () => {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
                 <div className="space-y-3">
-                  <button className="w-full flex items-center justify-center space-x-2 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors">
+                  <button
+                    onClick={() => navigate('/booking')}
+                    className="w-full flex items-center justify-center space-x-2 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition-colors"
+                  >
                     <Calendar className="w-4 h-4" />
                     <span>Book Session</span>
                   </button>
-                  <button className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors">
+                  <button
+                    onClick={() => navigate('/booking')}
+                    className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors"
+                  >
                     <Heart className="w-4 h-4" />
                     <span>Emergency Support</span>
                   </button>
-                  <button className="w-full flex items-center justify-center space-x-2 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors">
+                  <button
+                    onClick={() => navigate('/forum')}
+                    className="w-full flex items-center justify-center space-x-2 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors"
+                  >
                     <MessageSquare className="w-4 h-4" />
                     <span>Join Forum</span>
                   </button>

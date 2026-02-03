@@ -63,6 +63,13 @@ const bookingSchema = new mongoose.Schema({
   }
 });
 
+// Indexes for performance
+bookingSchema.index({ student: 1, createdAt: -1 }); // Student bookings query
+bookingSchema.index({ counsellor: 1, date: 1 }); // Counsellor availability check
+bookingSchema.index({ counsellor: 1, date: 1, 'timeSlot.startTime': 1, status: 1 }); // Duplicate booking check
+bookingSchema.index({ status: 1, createdAt: -1 }); // Status-based queries
+bookingSchema.index({ date: 1 }); // Date-based queries
+
 bookingSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();

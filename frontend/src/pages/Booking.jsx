@@ -23,6 +23,15 @@ const Booking = () => {
   const [error, setError] = useState(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedCounsellor, setSelectedCounsellor] = useState(null);
+  const [bookingForm, setBookingForm] = useState({
+    date: '',
+    startTime: '',
+    endTime: '',
+    sessionType: 'individual',
+    concern: ''
+  });
+  const [bookingError, setBookingError] = useState(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   const specializations = [
     { value: 'all', label: 'All Specializations' },
@@ -58,9 +67,40 @@ const Booking = () => {
         
         const response = await api.get('/bookings/counsellors');
         const fetchedCounsellors = response.data.data.counsellors;
-        
-        setCounsellors(fetchedCounsellors);
-        setFilteredCounsellors(fetchedCounsellors);
+
+        // Enrich counsellors with UI-friendly fields based on backend data
+        const enriched = fetchedCounsellors.map(c => {
+          const availability = Array.isArray(c.availability) ? c.availability : [];
+          const availableTimes = availability.map(slot => {
+            const day = slot.day || '';
+            const start = slot.startTime || '';
+            const end = slot.endTime || '';
+            return `${day} ${start}-${end}`.trim();
+          });
+
+          return {
+            ...c,
+            id: c._id,
+            avatar:
+              c.avatar ||
+              `https://via.placeholder.com/150/4f46e5/ffffff?text=${encodeURIComponent(
+                (c.name || 'C')[0]
+              )}`,
+            specialization: c.specialization || 'General Counseling',
+            specialties: c.specialties || [c.specialization || 'General Counseling'],
+            location: c.department || 'Campus counselling center',
+            experience: c.experience || Math.floor(Math.random() * 6) + 3, // 3–8 yrs mock
+            rating: c.rating || 4.5,
+            reviews: c.reviews || 24,
+            price: c.price || 0,
+            availability,
+            availableTimes,
+            isAvailable: availability.length > 0
+          };
+        });
+
+        setCounsellors(enriched);
+        setFilteredCounsellors(enriched);
       } catch (error) {
         console.error('Error fetching counsellors:', error);
         setError('Failed to load counsellors. Please try again.');
@@ -133,7 +173,76 @@ const Booking = () => {
    */
   const handleBooking = (counsellor) => {
     setSelectedCounsellor(counsellor);
+    setBookingForm({
+      date: '',
+      startTime: counsellor.availability?.[0]?.startTime || '',
+      endTime: counsellor.availability?.[0]?.endTime || '',
+      sessionType: 'individual',
+      concern: ''
+    });
+    setBookingError(null);
     setShowBookingModal(true);
+  };
+
+  /**
+   * Handle booking form changes
+   */
+  const handleBookingFormChange = (e) => {
+    const { name, value } = e.target;
+    setBookingForm(prev => ({ ...prev, [name]: value }));
+    if (bookingError) setBookingError(null);
+  };
+
+  /**
+   * Submit booking to backend
+   */
+  const handleSubmitBooking = async (e) => {
+    e.preventDefault();
+    if (!selectedCounsellor) return;
+
+    if (!bookingForm.date || !bookingForm.startTime || !bookingForm.endTime || !bookingForm.concern.trim()) {
+      setBookingError('Please select a date, time slot, and describe your concern.');
+      return;
+    }
+
+    try {
+      setBookingLoading(true);
+      setBookingError(null);
+
+      await api.post('/bookings', {
+        counsellorId: selectedCounsellor._id || selectedCounsellor.id,
+        date: bookingForm.date,
+        timeSlot: {
+          startTime: bookingForm.startTime,
+          endTime: bookingForm.endTime
+        },
+        concern: bookingForm.concern.trim(),
+        sessionType: bookingForm.sessionType
+      });
+
+      setShowBookingModal(false);
+      setSelectedCounsellor(null);
+      setBookingForm({
+        date: '',
+        startTime: '',
+        endTime: '',
+        sessionType: 'individual',
+        concern: ''
+      });
+      
+      // Show success message
+      alert('Session booked successfully! You can view it in your dashboard under Bookings.');
+      
+      // Optionally refresh the page or navigate to dashboard
+      // window.location.reload(); // Uncomment if you want to refresh the page
+    } catch (err) {
+      console.error('Error creating booking:', err);
+      setBookingError(
+        err.response?.data?.message || 'Failed to create booking. Please try a different time slot.'
+      );
+    } finally {
+      setBookingLoading(false);
+    }
   };
 
   /**
@@ -321,9 +430,9 @@ const Booking = () => {
             </div>
           ) : filteredCounsellors.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCounsellors.map(counsellor => (
+                  {filteredCounsellors.map(counsellor => (
                 <BookingCard
-                  key={counsellor.id}
+                  key={counsellor._id || counsellor.id}
                   counsellor={counsellor}
                   onBook={handleBooking}
                 />
@@ -360,62 +469,112 @@ const Booking = () => {
                 className="w-16 h-16 rounded-full mx-auto mb-2"
               />
               <p className="text-center text-gray-600">{selectedCounsellor.specialization}</p>
-              <p className="text-center text-lg font-bold text-primary-600">${selectedCounsellor.price}/session</p>
+              {selectedCounsellor.price > 0 && (
+                <p className="text-center text-lg font-bold text-primary-600">
+                  ${selectedCounsellor.price}/session
+                </p>
+              )}
             </div>
 
-            <div className="mb-4">
-              <h4 className="font-medium mb-2">Available Times:</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {selectedCounsellor.availableTimes.slice(0, 6).map((time, index) => (
-                  <button
-                    key={index}
-                    className="p-2 text-sm border border-gray-300 rounded hover:bg-primary-50 hover:border-primary-300 transition-colors"
-                  >
-                    {time}
-                  </button>
-                ))}
+            <form onSubmit={handleSubmitBooking} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  name="date"
+                  value={bookingForm.date}
+                  onChange={handleBookingFormChange}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  required
+                />
               </div>
-            </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Session Type
-              </label>
-              <select className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                <option>Individual Therapy (50 min)</option>
-                <option>Initial Consultation (60 min)</option>
-                <option>Follow-up Session (30 min)</option>
-              </select>
-            </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Time
+                  </label>
+                  <input
+                    type="time"
+                    name="startTime"
+                    value={bookingForm.startTime}
+                    onChange={handleBookingFormChange}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Time
+                  </label>
+                  <input
+                    type="time"
+                    name="endTime"
+                    value={bookingForm.endTime}
+                    onChange={handleBookingFormChange}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Additional Notes (Optional)
-              </label>
-              <textarea
-                rows="3"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="Any specific concerns or topics you'd like to discuss..."
-              ></textarea>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Session Type
+                </label>
+                <select
+                  name="sessionType"
+                  value={bookingForm.sessionType}
+                  onChange={handleBookingFormChange}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="individual">Individual Therapy</option>
+                  <option value="group">Group Session</option>
+                  <option value="emergency">Emergency</option>
+                </select>
+              </div>
 
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setShowBookingModal(false)}
-                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  alert('Session booked successfully! You will receive a confirmation email shortly.');
-                  setShowBookingModal(false);
-                }}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-              >
-                Book Session
-              </button>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Primary concern
+                </label>
+                <textarea
+                  name="concern"
+                  rows="3"
+                  value={bookingForm.concern}
+                  onChange={handleBookingFormChange}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Briefly describe what you'd like to talk about..."
+                  required
+                />
+              </div>
+
+              {bookingError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+                  {bookingError}
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBookingModal(false)}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={bookingLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={bookingLoading}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {bookingLoading ? 'Booking...' : 'Book Session'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

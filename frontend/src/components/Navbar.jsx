@@ -84,17 +84,23 @@ const Navbar = () => {
             </button>
 
             {/* User Profile */}
-            <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3">
+            {user?.avatar ? (
               <img
-                src={user?.avatar}
-                alt={user?.name}
+                src={user.avatar}
+                alt={user.name}
                 className="w-8 h-8 rounded-full object-cover"
               />
-              <div className="hidden sm:block">
-                <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-semibold uppercase">
+                {user?.name ? user.name.split(' ').map((word) => word[0]).slice(0, 2).join('') : <User className="w-4 h-4" />}
               </div>
+            )}
+            <div className="hidden sm:block">
+              <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+              <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
             </div>
+          </div>
 
             {/* Logout Button */}
             <button

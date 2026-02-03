@@ -6,16 +6,34 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../utils/api.js';
 
+// Simple UUID generator for anonymous sessions
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [anonymousId, setAnonymousId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Check for existing session on app load
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
+    // Ensure we are using .getItem() and not assigning to sessionStorage
+    const token = sessionStorage.getItem('token');
+    const userData = sessionStorage.getItem('user');
+    let currentAnonymousId = sessionStorage.getItem('anonymousId');
+
+    if (!currentAnonymousId) {
+      currentAnonymousId = generateUUID();
+      window.sessionStorage.setItem('anonymousId', currentAnonymousId);
+    }
+    setAnonymousId(currentAnonymousId);
 
     if (token && userData) {
       try {
@@ -23,20 +41,22 @@ export const AuthProvider = ({ children }) => {
         setUser(parsedUser);
       } catch (error) {
         console.error('Error parsing user data:', error);
-        localStorage.clear();
+        window.sessionStorage.clear();
       }
     }
+
     setLoading(false);
   }, []);
 
-  // Login with real API
+  // Login
   const login = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
       const { token, user: userData } = response.data.data;
 
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
+      // Use .setItem() - never use sessionStorage = ...
+      sessionStorage.setItem('token', token);
+      sessionStorage.setItem('user', JSON.stringify(userData));
 
       setUser(userData);
       return { success: true, user: userData };
@@ -45,14 +65,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Signup with real API
+  // Signup
   const signup = async (userData) => {
     try {
       const response = await api.post('/auth/register', userData);
       const { token, user: newUser } = response.data.data;
 
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(newUser));
+      sessionStorage.setItem('token', token);
+      sessionStorage.setItem('user', JSON.stringify(newUser));
 
       setUser(newUser);
       return { success: true, user: newUser };
@@ -61,8 +81,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Logout
   const logout = () => {
-    localStorage.clear();
+    window.sessionStorage.clear();
+
+    const newAnonymousId = generateUUID();
+    sessionStorage.setItem('anonymousId', newAnonymousId);
+    setAnonymousId(newAnonymousId);
+
     setUser(null);
   };
 
@@ -75,6 +101,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    anonymousId,
     login,
     signup,
     logout,
@@ -85,12 +112,18 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {loading ? <div className="text-center p-4">Loading session...</div> : children}
+      {loading ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center p-4">Loading session...</div>
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };
 
-// Custom hook to use auth context
+// Custom hook
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

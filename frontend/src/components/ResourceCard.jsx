@@ -3,112 +3,102 @@
  * Displays mental health resources with interactive features
  */
 
-import React, { useState } from 'react';
-import { BookOpen, Download, Heart, Share2, Clock, Tag } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { BookOpen, Download, Heart, Share2, Clock, Tag, ExternalLink } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.jsx';
+import api from '../utils/api.js';
 
 const ResourceCard = ({ resource }) => {
-  const [isLiked, setIsLiked] = useState(false);
-  const [likes, setLikes] = useState(resource.likes || 0);
+  const { user } = useAuth();
+  const userId = user?.id || user?._id;
+  const likeIds = useMemo(
+    () => (resource.likes || []).map((like) => (typeof like === 'string' ? like : like?._id)),
+    [resource.likes]
+  );
+  const [likeCount, setLikeCount] = useState(resource.likes?.length || resource.likesCount || 0);
+  const [isLiked, setIsLiked] = useState(() => (userId ? likeIds.includes(userId) : false));
+  const [likeLoading, setLikeLoading] = useState(false);
 
-  /**
-   * Handle like/unlike action
-   */
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    setLikes(prev => isLiked ? prev - 1 : prev + 1);
-  };
+  const resourceType = resource.category || 'article';
 
-  /**
-   * Handle resource download
-   */
-  const handleDownload = () => {
-    // In a real app, this would trigger actual download
-    alert(`Downloading: ${resource.title}`);
-  };
-
-  /**
-   * Handle resource sharing
-   */
-  const handleShare = () => {
-    // In a real app, this would open share dialog
-    if (navigator.share) {
-      navigator.share({
-        title: resource.title,
-        text: resource.description,
-        url: window.location.href
-      });
-    } else {
-      // Fallback for browsers that don't support Web Share API
-      navigator.clipboard.writeText(window.location.href);
-      alert('Link copied to clipboard!');
-    }
-  };
-
-  /**
-   * Get type-specific styling
-   */
   const getTypeStyles = () => {
-    switch (resource.type) {
-      case 'article':
-        return {
-          bg: 'bg-blue-100',
-          text: 'text-blue-700',
-          icon: BookOpen
-        };
+    switch (resourceType) {
       case 'video':
-        return {
-          bg: 'bg-red-100',
-          text: 'text-red-700',
-          icon: BookOpen
-        };
-      case 'audio':
-        return {
-          bg: 'bg-green-100',
-          text: 'text-green-700',
-          icon: BookOpen
-        };
-      case 'pdf':
-        return {
-          bg: 'bg-purple-100',
-          text: 'text-purple-700',
-          icon: Download
-        };
+        return { bg: 'bg-red-100', text: 'text-red-700', icon: BookOpen };
+      case 'podcast':
+        return { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: BookOpen };
+      case 'guide':
+        return { bg: 'bg-purple-100', text: 'text-purple-700', icon: BookOpen };
+      case 'exercise':
+        return { bg: 'bg-amber-100', text: 'text-amber-700', icon: BookOpen };
+      case 'article':
       default:
-        return {
-          bg: 'bg-gray-100',
-          text: 'text-gray-700',
-          icon: BookOpen
-        };
+        return { bg: 'bg-blue-100', text: 'text-blue-700', icon: BookOpen };
     }
   };
 
   const typeStyles = getTypeStyles();
   const TypeIcon = typeStyles.icon;
 
-  return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden">
-      {/* Resource Image */}
-      {resource.image && (
-        <div className="relative h-48 overflow-hidden">
-          <img
-            src={resource.image}
-            alt={resource.title}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute top-3 right-3">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${typeStyles.bg} ${typeStyles.text}`}>
-              {resource.type.toUpperCase()}
-            </span>
-          </div>
-        </div>
-      )}
+  const handleLike = async () => {
+    if (!userId) {
+      alert('Please log in to like resources.');
+      return;
+    }
+    if (likeLoading) return;
 
-      <div className="p-6">
-        {/* Resource Header */}
-        <div className="flex items-start justify-between mb-3">
+    setLikeLoading(true);
+    try {
+      const response = await api.post(`/resources/${resource._id}/like`);
+      const updatedCount = response.data?.data?.likesCount ?? likeCount + (isLiked ? -1 : 1);
+      setLikeCount(updatedCount);
+      setIsLiked(!isLiked);
+    } catch (error) {
+      console.error('Failed to toggle like', error);
+    } finally {
+      setLikeLoading(false);
+    }
+  };
+
+  const handleShare = () => {
+    const shareUrl = resource.url || resource.fileUrl || window.location.href;
+    if (navigator.share) {
+      navigator.share({
+        title: resource.title,
+        text: resource.description,
+        url: shareUrl
+      });
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      alert('Resource link copied to clipboard');
+    }
+  };
+
+  const handlePrimaryAction = () => {
+    const target = resource.url || resource.fileUrl;
+    if (target) {
+      window.open(target, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleDownload = () => {
+    if (resource.fileUrl) {
+      window.open(resource.fileUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const authorName = resource.uploadedBy?.name || 'DPI Counsellor';
+  const publishedDate = resource.createdAt
+    ? new Date(resource.createdAt).toLocaleDateString()
+    : 'Just now';
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-shadow overflow-hidden">
+      <div className="p-6 space-y-4">
+        <div className="flex items-start justify-between">
           <div className="flex items-center space-x-2">
             <TypeIcon className="w-5 h-5 text-gray-600" />
-            <span className="text-sm text-gray-600 capitalize">{resource.type}</span>
+            <span className="text-sm text-gray-600 capitalize">{resourceType}</span>
           </div>
           <div className="flex items-center space-x-1 text-sm text-gray-500">
             <Clock className="w-4 h-4" />
@@ -116,20 +106,14 @@ const ResourceCard = ({ resource }) => {
           </div>
         </div>
 
-        {/* Title and Description */}
-        <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-          {resource.title}
-        </h3>
-        <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-          {resource.description}
-        </p>
+        <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{resource.title}</h3>
+        <p className="text-sm text-gray-600 line-clamp-3">{resource.description}</p>
 
-        {/* Tags */}
         {resource.tags && resource.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {resource.tags.slice(0, 3).map((tag, index) => (
+          <div className="flex flex-wrap gap-2">
+            {resource.tags.slice(0, 3).map((tag) => (
               <span
-                key={index}
+                key={tag}
                 className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
               >
                 <Tag className="w-3 h-3 mr-1" />
@@ -137,43 +121,42 @@ const ResourceCard = ({ resource }) => {
               </span>
             ))}
             {resource.tags.length > 3 && (
-              <span className="text-xs text-gray-500">
-                +{resource.tags.length - 3} more
-              </span>
+              <span className="text-xs text-gray-500">+{resource.tags.length - 3} more</span>
             )}
           </div>
         )}
 
-        {/* Author and Date */}
-        <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+        <div className="flex items-center justify-between text-sm text-gray-500 pt-2 border-t border-gray-100">
           <div className="flex items-center space-x-2">
-            {resource.author?.avatar && (
-              <img
-                src={resource.author.avatar}
-                alt={resource.author.name}
-                className="w-6 h-6 rounded-full"
-              />
-            )}
-            <span>By {resource.author?.name || 'Anonymous'}</span>
+            <div className="w-8 h-8 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center text-xs font-semibold">
+              {authorName
+                .split(' ')
+                .map((chunk) => chunk[0])
+                .slice(0, 2)
+                .join('')}
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">{authorName}</p>
+              <p className="text-xs text-gray-500">Published {publishedDate}</p>
+            </div>
           </div>
-          <span>{new Date(resource.publishedAt).toLocaleDateString()}</span>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${typeStyles.bg} ${typeStyles.text}`}>
+            {resourceType.toUpperCase()}
+          </span>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
           <div className="flex items-center space-x-4">
-            {/* Like Button */}
             <button
               onClick={handleLike}
+              disabled={likeLoading}
               className={`flex items-center space-x-1 text-sm transition-colors ${
                 isLiked ? 'text-red-600' : 'text-gray-600 hover:text-red-600'
               }`}
             >
               <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-              <span>{likes}</span>
+              <span>{likeCount}</span>
             </button>
-
-            {/* Share Button */}
             <button
               onClick={handleShare}
               className="flex items-center space-x-1 text-sm text-gray-600 hover:text-primary-600 transition-colors"
@@ -183,38 +166,25 @@ const ResourceCard = ({ resource }) => {
             </button>
           </div>
 
-          {/* Primary Action Button */}
           <div className="flex space-x-2">
-            {resource.type === 'pdf' && (
+            {resource.fileUrl && (
               <button
                 onClick={handleDownload}
-                className="flex items-center space-x-1 px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                className="flex items-center space-x-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
               >
                 <Download className="w-4 h-4" />
                 <span>Download</span>
               </button>
             )}
-            <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium">
-              {resource.type === 'video' ? 'Watch' : 'Read More'}
+            <button
+              onClick={handlePrimaryAction}
+              className="flex items-center space-x-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>{resourceType === 'video' ? 'Watch' : 'Open resource'}</span>
             </button>
           </div>
         </div>
-
-        {/* Progress Bar (for articles/videos) */}
-        {resource.progress && (
-          <div className="mt-3">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-              <span>Progress</span>
-              <span>{resource.progress}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${resource.progress}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

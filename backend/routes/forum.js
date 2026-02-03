@@ -7,9 +7,10 @@ import {
   deletePost,
   likePost,
   addComment,
-  deleteComment
+  deleteComment,
+  getForumStats
 } from '../controllers/forumController.js';
-import { authenticate } from '../middlewares/authMiddleware.js';
+import { authenticate, optionalAuthenticate } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -17,9 +18,12 @@ router.post('/', authenticate, createPost);
 
 router.post('/create', authenticate, createPost);
 
-router.get('/', authenticate, getAllPosts);
+router.get('/stats', optionalAuthenticate, getForumStats);
 
-router.get('/:id', authenticate, getPostById);
+router.get('/', optionalAuthenticate, getAllPosts);
+
+// This route must come after /stats to avoid conflicts
+router.get('/:id', optionalAuthenticate, getPostById);
 
 router.put('/:id', authenticate, updatePost);
 

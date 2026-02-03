@@ -3,12 +3,15 @@
  * Handles file uploads to Cloudinary cloud storage
  */
 
-import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import cloudinary from 'cloudinary';
 import multer from 'multer';
 
+// Handle CommonJS module import for multer-storage-cloudinary
+// The default export IS CloudinaryStorage
+import CloudinaryStorage from 'multer-storage-cloudinary';
+
 // Configure Cloudinary
-cloudinary.config({
+cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
@@ -50,7 +53,7 @@ const upload = multer({
 // Helper function to delete file from Cloudinary
 export const deleteFromCloudinary = async (publicId) => {
   try {
-    const result = await cloudinary.uploader.destroy(publicId);
+    const result = await cloudinary.v2.uploader.destroy(publicId);
     return result;
   } catch (error) {
     console.error('Error deleting file from Cloudinary:', error);

@@ -1,4 +1,5 @@
 import Resource from '../models/Resource.js';
+import ResourceView from '../models/ResourceView.js';
 import upload from '../config/cloudinary.js';
 import { getFileInfo, deleteFromCloudinary } from '../config/cloudinary.js';
 
@@ -53,7 +54,7 @@ export const createResource = async (req, res) => {
 
 export const getAllResources = async (req, res) => {
   try {
-    const { category, tags, search } = req.query;
+    const { category, tags, search, page = 1, limit = 10 } = req.query;
 
     const query = { isPublished: true };
 
@@ -72,13 +73,23 @@ export const getAllResources = async (req, res) => {
       ];
     }
 
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const total = await Resource.countDocuments(query);
     const resources = await Resource.find(query)
       .populate('uploadedBy', 'name role')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
 
     res.status(200).json({
       success: true,
       count: resources.length,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
       data: { resources }
     });
   } catch (error) {
@@ -102,8 +113,27 @@ export const getResourceById = async (req, res) => {
       });
     }
 
+    // Increment total views
     resource.views += 1;
     await resource.save();
+
+    // Track user view if authenticated
+    const userId = req.userId || req.anonymousId;
+    if (userId && req.userId) {
+      // Only track for authenticated users (not anonymous)
+      try {
+        await ResourceView.findOneAndUpdate(
+          { user: req.userId, resource: resource._id },
+          { viewedAt: new Date() },
+          { upsert: true, new: true }
+        );
+      } catch (viewError) {
+        // Ignore duplicate key errors (already viewed)
+        if (viewError.code !== 11000) {
+          console.error('Error tracking resource view:', viewError);
+        }
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -197,6 +227,9 @@ export const deleteResource = async (req, res) => {
       }
     }
 
+    // Delete associated views
+    await ResourceView.deleteMany({ resource: resource._id });
+
     await Resource.findByIdAndDelete(req.params.id);
 
     res.status(200).json({
@@ -242,6 +275,33 @@ export const likeResource = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to like resource',
+      error: error.message
+    });
+  }
+};
+
+// Get user's resource read count
+export const getUserResourceReadCount = async (req, res) => {
+  try {
+    const userId = req.userId;
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    const readCount = await ResourceView.countDocuments({ user: userId });
+
+    res.status(200).json({
+      success: true,
+      data: { readCount }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch resource read count',
       error: error.message
     });
   }

@@ -176,3 +176,52 @@ export const updateProfile = async (req, res) => {
     });
   }
 };
+
+/**
+ * Simple password reset by email (no email OTP, for academic/demo use)
+ * POST /api/auth/forgot-password
+ * Body: { email, newPassword }
+ */
+export const resetPasswordByEmail = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and new password are required'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      // For security, don't reveal whether email exists
+      return res.status(200).json({
+        success: true,
+        message: 'If this email is registered, the password has been updated.'
+      });
+    }
+
+    user.password = newPassword; // hashed by pre-save hook
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password updated successfully. You can now log in with your new password.'
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
+      error: error.message
+    });
+  }
+};
